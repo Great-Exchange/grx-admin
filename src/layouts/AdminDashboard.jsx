@@ -8,6 +8,7 @@ import {
   AlertCircle,
   CreditCard,
   DollarSign,
+  ShoppingBag,
 } from "lucide-react";
 import Overview from "../pages/Overview";
 import GiftCards from "../pages/GiftCards";
@@ -19,10 +20,12 @@ import Header from "../components/Header";
 import giftCardStoreService from "../services/giftCardStoreService";
 import accountUpgradeService from "../services/accountUpgradeService";
 import withdrawalService from "../services/withdrawalService";
+import transactionService from "../services/transactionService";
 import userService from "../services/userService";
 import AccountUpgrades from "../pages/AccountUpgrades";
 import Withdrawals from "../pages/Withdrawals";
 import WithdrawalDetail from "../pages/WithdrawalDetail";
+import Transactions from "../pages/Transactions";
 
 export default function AdminDashboard({ setIsAuthenticated }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -38,6 +41,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
   const [level2Requests, setLevel2Requests] = useState([]);
   const [level3Requests, setLevel3Requests] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   // Drives the WithdrawalDetail modal — null = closed
   const [selectedWithdrawalId, setSelectedWithdrawalId] = useState(null);
@@ -50,6 +54,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
     { id: "giftcards", icon: Gift, label: "Gift Cards" },
     { id: "upgrades", icon: CreditCard, label: "Upgrades" },
     { id: "withdrawals", icon: DollarSign, label: "Withdrawals" },
+    { id: "transactions", icon: ShoppingBag, label: "Transactions" },
     { id: "users", icon: Users, label: "Users" },
     { id: "settings", icon: Settings, label: "Settings" },
   ];
@@ -69,6 +74,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
         level2Res,
         level3Res,
         withdrawalsRes,
+        transactionsRes,
       ] = await Promise.allSettled([
         giftCardStoreService.getAllStores(),
         giftCardStoreService.getAllGiftCards(),
@@ -76,6 +82,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
         accountUpgradeService.getPendingLevel2Requests(),
         accountUpgradeService.getPendingLevel3Requests(),
         withdrawalService.getAllWithdrawals(),
+        transactionService.getAllTransactions(),
       ]);
 
       if (storesRes.status === "fulfilled")
@@ -99,6 +106,10 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       if (withdrawalsRes.status === "fulfilled")
         setWithdrawals(withdrawalsRes.value.data);
       else console.error("❌ Withdrawals:", withdrawalsRes.reason);
+
+      if (transactionsRes.status === "fulfilled")
+        setTransactions(transactionsRes.value.data);
+      else console.error("❌ Transactions:", transactionsRes.reason);
     } catch (err) {
       setError("Failed to load dashboard data. Please try again.");
       console.error("❌ fetchAllData:", err);
@@ -133,10 +144,24 @@ export default function AdminDashboard({ setIsAuthenticated }) {
     }
   };
 
+  // Called by Transactions page after a status update
+  const fetchTransactions = async () => {
+    try {
+      const res = await transactionService.getAllTransactions();
+      setTransactions(res.data);
+    } catch (err) {
+      setError("Failed to refresh transactions.");
+      console.error("❌ fetchTransactions:", err);
+    }
+  };
+
   // ── Stats ────────────────────────────────────────────────────────
-  // API returns status as "Pending" (capital P) — compare case-insensitively
   const pendingWithdrawalsCount = withdrawals.filter(
     (w) => w.status?.toLowerCase() === "pending",
+  ).length;
+
+  const pendingTransactionsCount = transactions.filter(
+    (t) => t.status?.toLowerCase() === "pending",
   ).length;
 
   const stats = [
@@ -164,6 +189,12 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       icon: DollarSign,
       color: "bg-orange-500",
     },
+    {
+      label: "Pending Transactions",
+      value: pendingTransactionsCount.toLocaleString(),
+      icon: ShoppingBag,
+      color: "bg-pink-500",
+    },
   ];
 
   // ── Auth ─────────────────────────────────────────────────────────
@@ -179,6 +210,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       giftcards: "Gift Cards",
       upgrades: "Account Upgrades",
       withdrawals: "Withdrawals",
+      transactions: "Transactions",
       users: "Users",
       settings: "Settings",
     };
@@ -350,6 +382,14 @@ export default function AdminDashboard({ setIsAuthenticated }) {
             loading={loading}
           />
         );
+      case "transactions":
+        return (
+          <Transactions
+            transactions={transactions}
+            onTransactionUpdated={fetchTransactions}
+            loading={loading}
+          />
+        );
       case "users":
         return (
           <UsersTab
@@ -423,9 +463,7 @@ export default function AdminDashboard({ setIsAuthenticated }) {
         />
       )}
 
-      {/* WithdrawalDetail — opens when a withdrawal row is clicked.
-          onProcessed re-fetches the withdrawals list so the stat card
-          and table both update without a full page reload.              */}
+      {/* WithdrawalDetail — opens when a withdrawal row is clicked */}
       {selectedWithdrawalId && (
         <WithdrawalDetail
           withdrawalId={selectedWithdrawalId}
