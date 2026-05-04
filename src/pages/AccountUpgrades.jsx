@@ -158,15 +158,15 @@ function AccountUpgrades({
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    {/*
-                      API shape: { id, ..., user: "string" }
-                      user is a plain string (email or username) — NOT an object.
-                      Previous code used request.user.full_name which was always undefined.
-                    */}
                     <p className="text-base font-semibold text-gray-900 truncate">
-                      {request.user || "Unknown user"}
+                      {request.user?.full_name ||
+                        request.user?.email ||
+                        "Unknown user"}
                     </p>
                     <p className="text-sm text-gray-500 mt-0.5">
+                      {request.user?.email && (
+                        <span className="mr-2">{request.user.email} •</span>
+                      )}
                       Level {levelNumber} Upgrade Request • ID #{request.id}
                     </p>
                   </div>

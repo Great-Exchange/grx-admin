@@ -95,9 +95,10 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       if (usersRes.status === "fulfilled") setUsers(usersRes.value.data);
       else console.error("❌ Users:", usersRes.reason);
 
-      if (level2Res.status === "fulfilled")
+      if (level2Res.status === "fulfilled") {
+        console.log(level2Res.value.data);
         setLevel2Requests(level2Res.value.data);
-      else console.error("❌ Level 2:", level2Res.reason);
+      } else console.error("❌ Level 2:", level2Res.reason);
 
       if (level3Res.status === "fulfilled")
         setLevel3Requests(level3Res.value.data);
