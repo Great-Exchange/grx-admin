@@ -1,41 +1,40 @@
 import axiosInstance from "./api/axiosConfig";
 
+const logError = (label, err) => {
+  console.error(`❌ ${label} error:`, err.response?.data ?? err.message);
+  throw err;
+};
+
 const accountUpgradeService = {
-  // List all pending Level 2 credential submissions
-  // GET /admin/pending/level2/
-  // Response: [{ id, nin, nin_image, status, approved, user }]
-  getPendingLevel2Requests: () => {
-    return axiosInstance.get("/admin/pending/level2/");
-  },
+  getPendingLevel2Requests: () =>
+    axiosInstance
+      .get("/admin/pending/level2/")
+      .catch((err) => logError("getPendingLevel2Requests", err)),
 
-  // List all pending Level 3 credential submissions
-  // GET /admin/pending/level3/
-  // Response: [{ id, house_address_1, house_address_2, nearest_bus_stop,
-  //              city, state, country, proof_of_address_image,
-  //              face_verification_image, status, approved, user }]
-  getPendingLevel3Requests: () => {
-    return axiosInstance.get("/admin/pending/level3/");
-  },
+  getPendingLevel3Requests: () =>
+    axiosInstance
+      .get("/admin/pending/level3/")
+      .catch((err) => logError("getPendingLevel3Requests", err)),
 
-  // Approve Level 2 upgrade — POST /admin/approve/level2/{credential_id}/
-  approveLevel2: (credentialId) => {
-    return axiosInstance.post(`/admin/approve/level2/${credentialId}/`);
-  },
+  approveLevel2: (credentialId) =>
+    axiosInstance
+      .post(`/admin/approve/level2/${credentialId}/`, { action: "approve" })
+      .catch((err) => logError("approveLevel2", err)),
 
-  // Approve Level 3 upgrade — POST /admin/approve/level3/{credential_id}/
-  approveLevel3: (credentialId) => {
-    return axiosInstance.post(`/admin/approve/level3/${credentialId}/`);
-  },
+  approveLevel3: (credentialId) =>
+    axiosInstance
+      .post(`/admin/approve/level3/${credentialId}/`, { action: "approve" })
+      .catch((err) => logError("approveLevel3", err)),
 
-  // Reject Level 2 upgrade — POST /admin/reject/level2/{credential_id}/
-  rejectLevel2: (credentialId) => {
-    return axiosInstance.post(`/admin/reject/level2/${credentialId}/`);
-  },
+  rejectLevel2: (credentialId) =>
+    axiosInstance
+      .post(`/admin/reject/level2/${credentialId}/`, { action: "reject" })
+      .catch((err) => logError("rejectLevel2", err)),
 
-  // Reject Level 3 upgrade — POST /admin/reject/level3/{credential_id}/
-  rejectLevel3: (credentialId) => {
-    return axiosInstance.post(`/admin/reject/level3/${credentialId}/`);
-  },
+  rejectLevel3: (credentialId) =>
+    axiosInstance
+      .post(`/admin/reject/level3/${credentialId}/`, { action: "reject" })
+      .catch((err) => logError("rejectLevel3", err)),
 };
 
 export default accountUpgradeService;

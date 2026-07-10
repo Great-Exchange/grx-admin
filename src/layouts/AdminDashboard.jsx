@@ -10,10 +10,6 @@ import {
   DollarSign,
   ShoppingBag,
 } from "lucide-react";
-import Overview from "../pages/Overview";
-import GiftCards from "../pages/GiftCards";
-import UsersTab from "../pages/Users";
-import SettingsTab from "../pages/Settings";
 import Modal from "../components/Modal";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -22,14 +18,11 @@ import accountUpgradeService from "../services/accountUpgradeService";
 import withdrawalService from "../services/withdrawalService";
 import transactionService from "../services/transactionService";
 import userService from "../services/userService";
-import AccountUpgrades from "../pages/AccountUpgrades";
-import Withdrawals from "../pages/Withdrawals";
 import WithdrawalDetail from "../pages/WithdrawalDetail";
-import Transactions from "../pages/Transactions";
+import { Outlet, useLocation } from "react-router-dom";
 
 export default function AdminDashboard({ setIsAuthenticated }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [modalEditData, setModalEditData] = useState(null);
@@ -85,9 +78,10 @@ export default function AdminDashboard({ setIsAuthenticated }) {
         transactionService.getAllTransactions(),
       ]);
 
-      if (storesRes.status === "fulfilled")
+      if (storesRes.status === "fulfilled") {
+        console.log(storesRes.value.data);
         setGiftCardStores(storesRes.value.data);
-      else console.error("❌ Stores:", storesRes.reason);
+      } else console.error("❌ Stores:", storesRes.reason);
 
       if (cardsRes.status === "fulfilled") setGiftCards(cardsRes.value.data);
       else console.error("❌ Gift cards:", cardsRes.reason);
@@ -205,7 +199,11 @@ export default function AdminDashboard({ setIsAuthenticated }) {
     setIsAuthenticated(false);
   };
 
+  const location = useLocation();
+
   const getPageTitle = () => {
+    const path = location.pathname.split("/")[2] || "overview";
+
     const titles = {
       overview: "Overview",
       giftcards: "Gift Cards",
@@ -215,7 +213,8 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       users: "Users",
       settings: "Settings",
     };
-    return titles[activeTab] || "Dashboard";
+
+    return titles[path] || "Overview";
   };
 
   // ── Modal ────────────────────────────────────────────────────────
@@ -330,6 +329,23 @@ export default function AdminDashboard({ setIsAuthenticated }) {
     }
   };
 
+  // ------------------------------TRANSACTION HANDLERS---------------------------
+  const handleTransactionStatusUpdate = async (transactionId, payload) => {
+    try {
+      await transactionService.updateTransactionStatus(transactionId, payload);
+
+      // Refresh transaction list
+      await fetchTransactions();
+
+      setError(null);
+    } catch (err) {
+      console.error("❌ handleTransactionStatusUpdate:", err);
+
+      setError("Failed to update transaction status.");
+
+      throw err;
+    }
+  };
   // ── Modal submit router ──────────────────────────────────────────
   const getModalSubmitHandler = () => {
     if (modalType === "create-store") return handleCreateStore;
@@ -340,83 +356,50 @@ export default function AdminDashboard({ setIsAuthenticated }) {
   };
 
   // ── Tab renderer ─────────────────────────────────────────────────
-  const renderContent = () => {
-    switch (activeTab) {
-      case "overview":
-        return (
-          <Overview
-            stats={stats}
-            giftCardStores={giftCardStores}
-            giftCards={giftCards}
-            users={users}
-            withdrawals={withdrawals}
-            loading={loading}
-          />
-        );
-      case "giftcards":
-        return (
-          <GiftCards
-            giftCardStores={giftCardStores}
-            giftCards={giftCards}
-            onEdit={openModal}
-            onDelete={handleDeleteStore}
-            onDeleteCard={handleDeleteGiftCard}
-            onCreate={openModal}
-            loading={loading}
-          />
-        );
-      case "upgrades":
-        return (
-          <AccountUpgrades
-            level2Requests={level2Requests}
-            level3Requests={level3Requests}
-            onApprove={handleApproveUpgrade}
-            onReject={handleRejectUpgrade}
-            loading={loading}
-          />
-        );
-      case "withdrawals":
-        return (
-          <Withdrawals
-            withdrawals={withdrawals}
-            onViewDetails={(id) => setSelectedWithdrawalId(id)}
-            loading={loading}
-          />
-        );
-      case "transactions":
-        return (
-          <Transactions
-            transactions={transactions}
-            onTransactionUpdated={fetchTransactions}
-            loading={loading}
-          />
-        );
-      case "users":
-        return (
-          <UsersTab
-            users={users}
-            onEdit={openModal}
-            onDelete={(id) =>
-              setUsers((prev) => prev.filter((u) => u.id !== id))
-            }
-            onCreate={() => openModal("create-user")}
-            loading={loading}
-          />
-        );
-      case "settings":
-        return <SettingsTab />;
-      default:
-        return (
-          <Overview
-            stats={stats}
-            giftCardStores={giftCardStores}
-            giftCards={giftCards}
-            users={users}
-            withdrawals={withdrawals}
-            loading={loading}
-          />
-        );
-    }
+
+  const outletContext = {
+    // Dashboard data
+    stats,
+    giftCardStores,
+    giftCards,
+    users,
+    level2Requests,
+    level3Requests,
+    withdrawals,
+    transactions,
+
+    // UI state
+    loading,
+    error,
+    setError,
+
+    // Modal
+    openModal,
+    closeModal,
+
+    // Refresh methods
+    fetchGiftCardData,
+    fetchWithdrawals,
+    fetchTransactions,
+
+    // Upgrade handlers
+    handleApproveUpgrade,
+    handleRejectUpgrade,
+
+    // Transaction handlers
+    handleTransactionStatusUpdate,
+
+    // Gift card handlers
+    handleDeleteStore,
+    handleDeleteGiftCard,
+
+    // User handlers
+    setUsers,
+
+    // Withdrawal modal
+    // Withdrawal modal
+    selectedWithdrawalId,
+    setSelectedWithdrawalId,
   };
 
   return (
@@ -424,8 +407,6 @@ export default function AdminDashboard({ setIsAuthenticated }) {
       <Sidebar
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
         menuItems={menuItems}
         handleLogout={handleLogout}
       />
@@ -449,7 +430,9 @@ export default function AdminDashboard({ setIsAuthenticated }) {
         )}
 
         <main className="flex-1 overflow-auto">
-          <div className="p-8">{renderContent()}</div>
+          <div className="p-8">
+            <Outlet context={outletContext} />
+          </div>
         </main>
       </div>
 

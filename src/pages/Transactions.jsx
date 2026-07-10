@@ -10,7 +10,7 @@ import {
   AlertCircle,
   ShoppingBag,
 } from "lucide-react";
-import transactionService from "../services/transactionService";
+import { useOutletContext } from "react-router-dom";
 
 // ── Status helpers ───────────────────────────────────────────────────────────
 
@@ -44,7 +44,12 @@ const getStatusIcon = (status) => {
 
 // ── TransactionDetailModal ───────────────────────────────────────────────────
 
-function TransactionDetailModal({ transaction, onClose, onStatusUpdated }) {
+function TransactionDetailModal({
+  transaction,
+  onClose,
+  onStatusUpdated,
+  onUpdateStatus,
+}) {
   const [status, setStatus] = useState(transaction.status || "Pending");
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -59,7 +64,7 @@ function TransactionDetailModal({ transaction, onClose, onStatusUpdated }) {
     setSuccess(null);
     setProcessing(true);
     try {
-      await transactionService.updateTransactionStatus(transaction.id, {
+      await onUpdateStatus(transaction.id, {
         status,
         admin_notes: adminNotes,
       });
@@ -309,7 +314,13 @@ function TransactionDetailModal({ transaction, onClose, onStatusUpdated }) {
 
 // ── Transactions (main page) ─────────────────────────────────────────────────
 
-function Transactions({ transactions, onTransactionUpdated, loading }) {
+function Transactions() {
+  const {
+    transactions,
+    loading,
+    handleTransactionStatusUpdate,
+    fetchTransactions,
+  } = useOutletContext();
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -527,9 +538,10 @@ function Transactions({ transactions, onTransactionUpdated, loading }) {
         <TransactionDetailModal
           transaction={selectedTransaction}
           onClose={() => setSelectedTransaction(null)}
+          onUpdateStatus={handleTransactionStatusUpdate}
           onStatusUpdated={() => {
             setSelectedTransaction(null);
-            onTransactionUpdated();
+            fetchTransactions();
           }}
         />
       )}

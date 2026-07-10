@@ -3,6 +3,13 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import AuthApp from "../pages/auth/AuthApp";
 import AdminDashboard from "../layouts/AdminDashboard";
+import Overview from "../pages/Overview";
+import GiftCards from "../pages/GiftCards";
+import AccountUpgrades from "../pages/AccountUpgrades";
+import Withdrawals from "../pages/Withdrawals";
+import Transactions from "../pages/Transactions";
+import UsersTab from "../pages/Users";
+import SettingsTab from "../pages/Settings";
 
 const Routy = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(null); // null = loading
@@ -51,11 +58,27 @@ const Routy = () => {
           <>
             {/* Dashboard Routes - Only accessible when authenticated */}
             <Route
-              path="/u/*"
+              path="/u"
               element={
                 <AdminDashboard setIsAuthenticated={setIsAuthenticated} />
               }
-            />
+            >
+              <Route index element={<Navigate to="overview" replace />} />
+
+              <Route path="overview" element={<Overview />} />
+
+              <Route path="giftcards" element={<GiftCards />} />
+
+              <Route path="upgrades" element={<AccountUpgrades />} />
+
+              <Route path="withdrawals" element={<Withdrawals />} />
+
+              <Route path="transactions" element={<Transactions />} />
+
+              <Route path="users" element={<UsersTab />} />
+
+              <Route path="settings" element={<SettingsTab />} />
+            </Route>
             {/* Redirect any other route to dashboard */}
             <Route path="*" element={<Navigate to="/u" replace />} />
           </>

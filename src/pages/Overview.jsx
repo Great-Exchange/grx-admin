@@ -1,15 +1,20 @@
 import React from "react";
+import { useOutletContext } from "react-router-dom";
 import StatsCard from "../components/StatsCard";
 import { Loader } from "lucide-react";
 
-const Overview = ({
-  stats,
-  giftCardStores,
-  giftCards,
-  users,
-  withdrawals,
-  loading,
-}) => {
+const Overview = (props = {}) => {
+  const context = useOutletContext() || {};
+
+  const {
+    stats = props.stats,
+    giftCardStores = props.giftCardStores,
+    giftCards = props.giftCards,
+    users = props.users,
+    withdrawals = props.withdrawals,
+    loading = props.loading,
+  } = context;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">

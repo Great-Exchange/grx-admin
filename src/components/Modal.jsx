@@ -9,6 +9,15 @@ import {
 } from "lucide-react";
 import giftCardStoreService from "../services/giftCardStoreService";
 
+// ── Helper: convert a File to base64 string ──────────────────────────────────
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); // data:image/...;base64,...
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 function ModalComponent({
   type,
   onClose,
@@ -19,6 +28,7 @@ function ModalComponent({
   const [formData, setFormData] = useState({});
   const [cards, setCards] = useState([{ type: "Both", name: "", rate: "" }]);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null); // keep File separate
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -39,7 +49,7 @@ function ModalComponent({
           name: "category",
           label: "Category",
           type: "select",
-          options: ["All", "Popular", "Shopping"],
+          options: ["Popular", "Shopping"],
         },
       ],
     },
@@ -52,7 +62,7 @@ function ModalComponent({
           name: "category",
           label: "Category",
           type: "select",
-          options: ["All", "Popular", "Shopping"],
+          options: ["Popular", "Shopping"],
         },
       ],
     },
@@ -100,7 +110,6 @@ function ModalComponent({
     if (editData) {
       setFormData(editData);
 
-      // For edit-store: pre-fill existing cards if available
       if (
         type === "edit-store" &&
         editData.cards &&
@@ -115,7 +124,6 @@ function ModalComponent({
         );
       }
 
-      // For edit-card: pre-fill the store search input
       if (type === "edit-card") {
         const storeId = editData.store?.id || editData.store;
         const storeObj = giftCardStores.find((s) => s.id === storeId);
@@ -145,16 +153,9 @@ function ModalComponent({
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log("📸 Image selected:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
+      setImageFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-        setFormData({ ...formData, image: file });
-      };
+      reader.onloadend = () => setImagePreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
@@ -184,13 +185,33 @@ function ModalComponent({
     setShowStoreDropdown(false);
   };
 
+  // ── Extract a readable error message from an Axios error ─────────────────
+  const extractError = (err) => {
+    const data = err.response?.data;
+    if (!data) return err.message || "An unexpected error occurred.";
+
+    // DRF often returns { field: ["msg"], detail: "msg", non_field_errors: [...] }
+    if (typeof data === "string") return data;
+    if (data.detail) return data.detail;
+    if (data.non_field_errors) return data.non_field_errors.join(" ");
+
+    // Flatten field-level errors into one readable string
+    const messages = Object.entries(data)
+      .map(([field, msgs]) => {
+        const text = Array.isArray(msgs) ? msgs.join(", ") : String(msgs);
+        return `${field}: ${text}`;
+      })
+      .join(" | ");
+    return messages || "Failed to save. Please check your input.";
+  };
+
   const handleSubmit = async () => {
     setError(null);
     setSuccess(null);
 
     // ── CREATE / EDIT STORE ──────────────────────────────────────────
     if (type === "create-store" || type === "edit-store") {
-      if (!formData.name) {
+      if (!formData.name?.trim()) {
         setError("Store name is required");
         return;
       }
@@ -203,7 +224,7 @@ function ModalComponent({
         return;
       }
       for (let card of cards) {
-        if (!card.name) {
+        if (!card.name?.trim()) {
           setError("All cards must have a name");
           return;
         }
@@ -215,48 +236,48 @@ function ModalComponent({
 
       setLoading(true);
       try {
-        const formDataToSend = new FormData();
-        formDataToSend.append("name", formData.name);
-        formDataToSend.append("category", formData.category);
-
-        if (formData.image instanceof File) {
-          formDataToSend.append("image", formData.image);
-        }
-
-        const cardsToAdd = cards.map((card) => ({
+        // Build the cards array — match API spec exactly
+        const cardsPayload = cards.map((card) => ({
           type: card.type || "Both",
           name: card.name.trim(),
-          rate: parseFloat(card.rate),
+          rate: String(parseFloat(card.rate)), // API spec shows rate as string
         }));
-        formDataToSend.append("cards", JSON.stringify(cardsToAdd));
+
+        // The API accepts multipart/form-data.
+        // `cards` must be sent as a JSON string in the form field —
+        // this is the standard DRF pattern when mixing file uploads with nested data.
+        const fd = new FormData();
+        fd.append("name", formData.name.trim());
+        fd.append("category", formData.category);
+        fd.append("cards", JSON.stringify(cardsPayload));
+
+        // Image: only append if a new file was selected
+        if (imageFile instanceof File) {
+          fd.append("image", imageFile);
+        }
+        // If editing and no new image selected, omit the image field entirely
+        // so the backend keeps the existing one.
+
+        // Debug: log what we're sending
+        console.log("📤 Store payload:");
+        for (let [key, val] of fd.entries()) {
+          console.log(`  ${key}:`, val);
+        }
 
         let response;
         if (type === "create-store") {
-          console.log("📤 Creating store...");
-          response = await giftCardStoreService.createStore(formDataToSend);
+          response = await giftCardStoreService.createStore(fd);
           setSuccess("Store created successfully!");
         } else {
-          console.log("📤 Updating store ID:", editData.id);
-          response = await giftCardStoreService.updateStore(
-            editData.id,
-            formDataToSend,
-          );
+          response = await giftCardStoreService.updateStore(editData.id, fd);
           setSuccess("Store updated successfully!");
         }
 
         console.log("✅ Response:", response.data);
-        // ✅ FIX: only call onSubmit — the dashboard handler owns the close
-        setTimeout(() => {
-          onSubmit(response.data);
-        }, 1500);
+        setTimeout(() => onSubmit(response.data), 1500);
       } catch (err) {
-        console.error("❌ Error:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            err.message ||
-            "Failed to save store. Please try again.",
-        );
+        console.error("❌ Store save error:", err.response?.data || err);
+        setError(extractError(err));
         setLoading(false);
       }
 
@@ -266,7 +287,7 @@ function ModalComponent({
         setError("Type is required");
         return;
       }
-      if (!formData.name) {
+      if (!formData.name?.trim()) {
         setError("Card name is required");
         return;
       }
@@ -283,7 +304,7 @@ function ModalComponent({
       try {
         const giftCardData = {
           type: formData.type,
-          name: formData.name,
+          name: formData.name.trim(),
           rate: parseFloat(formData.rate),
           store: selectedStoreId,
         };
@@ -292,18 +313,10 @@ function ModalComponent({
           await giftCardStoreService.createGiftCard(giftCardData);
         console.log("✅ Gift Card Created:", response.data);
         setSuccess("Gift card created successfully!");
-        // ✅ FIX: only call onSubmit — the dashboard handler owns the close
-        setTimeout(() => {
-          onSubmit(response.data);
-        }, 1500);
+        setTimeout(() => onSubmit(response.data), 1500);
       } catch (err) {
-        console.error("❌ Error creating gift card:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            err.message ||
-            "Failed to create gift card. Please try again.",
-        );
+        console.error("❌ Gift card create error:", err.response?.data || err);
+        setError(extractError(err));
         setLoading(false);
       }
 
@@ -313,7 +326,7 @@ function ModalComponent({
         setError("Type is required");
         return;
       }
-      if (!formData.name) {
+      if (!formData.name?.trim()) {
         setError("Card name is required");
         return;
       }
@@ -332,7 +345,7 @@ function ModalComponent({
       try {
         const giftCardData = {
           type: formData.type,
-          name: formData.name,
+          name: formData.name.trim(),
           rate: parseFloat(formData.rate),
           store: resolvedStoreId,
         };
@@ -343,18 +356,10 @@ function ModalComponent({
         );
         console.log("✅ Gift Card Updated:", response.data);
         setSuccess("Gift card updated successfully!");
-        // ✅ FIX: only call onSubmit — the dashboard handler owns the close
-        setTimeout(() => {
-          onSubmit(response.data);
-        }, 1500);
+        setTimeout(() => onSubmit(response.data), 1500);
       } catch (err) {
-        console.error("❌ Error updating gift card:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            err.message ||
-            "Failed to update gift card. Please try again.",
-        );
+        console.error("❌ Gift card update error:", err.response?.data || err);
+        setError(extractError(err));
         setLoading(false);
       }
 
@@ -367,6 +372,7 @@ function ModalComponent({
 
   const handleClose = () => {
     setImagePreview(null);
+    setImageFile(null);
     setFormData({});
     setCards([{ type: "Both", name: "", rate: "" }]);
     setStoreSearchTerm("");
@@ -376,7 +382,6 @@ function ModalComponent({
     onClose();
   };
 
-  // Whether to show the card/store-select form layout
   const isCardForm = type === "create-card" || type === "edit-card";
   const isStoreForm = type === "create-store" || type === "edit-store";
 
@@ -396,15 +401,16 @@ function ModalComponent({
           </button>
         </div>
 
-        {/* Error Message */}
+        {/* Error / Success */}
         {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-            <AlertCircle size={20} className="text-red-600" />
+          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle
+              size={20}
+              className="text-red-600 flex-shrink-0 mt-0.5"
+            />
             <span className="text-red-700 text-sm">{error}</span>
           </div>
         )}
-
-        {/* Success Message */}
         {success && (
           <div className="mx-6 mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={20} className="text-green-600" />
@@ -417,7 +423,6 @@ function ModalComponent({
           {/* ── GIFT CARD FORM (create-card & edit-card) ── */}
           {isCardForm ? (
             <>
-              {/* Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type
@@ -434,7 +439,6 @@ function ModalComponent({
                 </select>
               </div>
 
-              {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Name
@@ -448,7 +452,6 @@ function ModalComponent({
                 />
               </div>
 
-              {/* Rate */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Rate
@@ -540,7 +543,6 @@ function ModalComponent({
                         onChange={handleImageChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
-                      {/* Show existing image URL or new preview */}
                       {(imagePreview || formData.image) && (
                         <div className="mt-4 flex justify-center">
                           <img
@@ -577,7 +579,6 @@ function ModalComponent({
                     key={index}
                     className="bg-white border border-gray-200 rounded-lg p-4 space-y-3"
                   >
-                    {/* Card Type */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Type
@@ -595,7 +596,6 @@ function ModalComponent({
                       </select>
                     </div>
 
-                    {/* Card Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Name
@@ -611,7 +611,6 @@ function ModalComponent({
                       />
                     </div>
 
-                    {/* Card Rate */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Rate (₦)
@@ -691,7 +690,7 @@ export function ConfirmationModal({
   description,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  type = "danger", // 'danger' | 'warning' | 'info'
+  type = "danger",
   onConfirm,
   onCancel,
   isLoading = false,
@@ -740,7 +739,6 @@ export function ConfirmationModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           <button
@@ -752,7 +750,6 @@ export function ConfirmationModal({
           </button>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-6 space-y-4">
           <div
             className={`p-4 rounded-lg ${colors.bg} border ${colors.border} flex items-start gap-3`}
@@ -771,7 +768,6 @@ export function ConfirmationModal({
           <p className="text-sm text-gray-600">Please confirm to proceed.</p>
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex gap-3 justify-end">
           <button
             onClick={onCancel}

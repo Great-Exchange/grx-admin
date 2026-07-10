@@ -8,16 +8,18 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { ConfirmationModal } from "../components/Modal";
+import { useOutletContext } from "react-router-dom";
 
-function GiftCards({
-  giftCardStores,
-  giftCards,
-  onEdit,
-  onDelete,
-  onDeleteCard,
-  onCreate,
-  loading,
-}) {
+function GiftCards() {
+  const {
+    giftCardStores,
+    giftCards,
+    loading,
+    openModal,
+    handleDeleteStore,
+    handleDeleteGiftCard,
+  } = useOutletContext();
+
   const [expandedStore, setExpandedStore] = useState(null);
 
   const [confirmModal, setConfirmModal] = useState({
@@ -48,7 +50,7 @@ function GiftCards({
       <div className="text-center py-12 bg-white rounded-xl shadow">
         <p className="text-gray-600 mb-4">No gift card stores found</p>
         <button
-          onClick={() => onCreate("create-store")}
+          onClick={() => openModal("create-store")}
           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 mx-auto"
         >
           <Plus size={18} /> Create First Store
@@ -60,7 +62,7 @@ function GiftCards({
   // GET /admin/list-gift-cards returns: { id, name, rate, type, store: { id, name } }
   // We filter cards by store id to group them under each store
   const getStoreGiftCards = (storeId) => {
-    return giftCards.filter((card) => card.store?.id === storeId);
+    return giftCards?.filter((card) => card.store?.id === storeId) || [];
   };
 
   const resetConfirmModal = () => {
@@ -128,13 +130,13 @@ function GiftCards({
     setConfirmModal((prev) => ({ ...prev, isProcessing: true }));
     try {
       if (confirmModal.type === "delete-store") {
-        await onDelete(confirmModal.targetId);
+        await handleDeleteStore(confirmModal.targetId);
       } else if (confirmModal.type === "delete-card") {
-        await onDeleteCard(confirmModal.targetId);
+        await handleDeleteGiftCard(confirmModal.targetId);
       } else if (confirmModal.type === "edit-store") {
-        onEdit("edit-store", confirmModal.targetData);
+        openModal("edit-store", confirmModal.targetData);
       } else if (confirmModal.type === "edit-card") {
-        onEdit("edit-card", confirmModal.targetData);
+        openModal("edit-card", confirmModal.targetData);
       }
       resetConfirmModal();
     } catch (error) {
@@ -204,13 +206,13 @@ function GiftCards({
         </h3>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => onCreate("create-card")}
+            onClick={() => openModal("create-card")}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
           >
             <Plus size={18} /> Create Gift Card
           </button>
           <button
-            onClick={() => onCreate("create-store")}
+            onClick={() => openModal("create-store")}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
           >
             <Plus size={18} /> Create Store
@@ -220,7 +222,7 @@ function GiftCards({
 
       {/* Stores List */}
       <div className="space-y-3">
-        {giftCardStores.map((store) => {
+        {(giftCardStores || []).map((store) => {
           // GET /admin/list-gift-stores returns: { id, name }
           // card count is derived from the giftCards array, not the store object
           const storeCards = getStoreGiftCards(store.id);
@@ -311,7 +313,7 @@ function GiftCards({
                               <div className="flex flex-col items-center gap-3">
                                 <p>No gift cards for this store yet</p>
                                 <button
-                                  onClick={() => onCreate("create-card")}
+                                  onClick={() => openModal("create-card")}
                                   className="px-3 py-1 text-sm bg-purple-100 text-purple-600 rounded hover:bg-purple-200 transition"
                                 >
                                   Add Gift Card

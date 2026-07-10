@@ -44,10 +44,14 @@ export default function LoginPage({ setAuthPage, onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const newErrors = validateForm();
 
     if (Object.keys(newErrors).length === 0) {
       setLoading(true);
+      setErrors({});
+      setSuccessMessage("");
+
       try {
         // Call API service
         const response = await authService.login(
@@ -63,6 +67,7 @@ export default function LoginPage({ setAuthPage, onLoginSuccess }) {
           localStorage.setItem("refreshToken", response.data.refresh);
         }
 
+        setLoading(false);
         setSuccessMessage("Login successful! Redirecting...");
 
         // Wait 1.5 seconds then call success callback
@@ -71,12 +76,23 @@ export default function LoginPage({ setAuthPage, onLoginSuccess }) {
         }, 1500);
       } catch (error) {
         setLoading(false);
+
+        const errorMessage =
+          error.response?.data?.detail ||
+          error.response?.data?.non_field_errors?.[0] ||
+          "Invalid email or password.";
+
         setErrors({
-          submit:
-            error.response?.data?.detail ||
-            error.response?.data?.non_field_errors?.[0] ||
-            "Login failed. Please try again.",
+          submit: errorMessage,
         });
+
+        // Automatically clear the error after 4 seconds
+        setTimeout(() => {
+          setErrors((prev) => ({
+            ...prev,
+            submit: "",
+          }));
+        }, 4000);
       }
     } else {
       setErrors(newErrors);

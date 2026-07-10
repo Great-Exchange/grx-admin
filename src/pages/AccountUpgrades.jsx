@@ -3,19 +3,21 @@ import {
   CheckCircle,
   XCircle,
   Loader,
-  AlertCircle,
   User,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
 
-function AccountUpgrades({
-  level2Requests,
-  level3Requests,
-  onApprove,
-  onReject,
-  loading,
-}) {
+function AccountUpgrades() {
+  const {
+    level2Requests,
+    level3Requests,
+    loading,
+    handleApproveUpgrade,
+    handleRejectUpgrade,
+  } = useOutletContext();
+
   const [expandedRequest, setExpandedRequest] = useState(null);
   const [activeTab, setActiveTab] = useState("level2");
 
@@ -86,9 +88,9 @@ function AccountUpgrades({
     setPendingConfirm(null);
     try {
       if (action === "approve") {
-        await onApprove(id, level);
+        await handleApproveUpgrade(id, level);
       } else {
-        await onReject(id, level);
+        await handleRejectUpgrade(id, level);
       }
     } finally {
       setProcessing(null);

@@ -1,21 +1,17 @@
 import { LogOut, Menu, X } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
-function Sidebar({
-  isOpen,
-  setIsOpen,
-  activeTab,
-  setActiveTab,
-  menuItems,
-  handleLogout,
-}) {
+function Sidebar({ isOpen, setIsOpen, menuItems, handleLogout }) {
   return (
     <div
       className={`${
         isOpen ? "w-64" : "w-20"
       } bg-[#FF006A] text-white transition-all duration-300 fixed h-screen overflow-y-auto shadow-lg`}
     >
+      {/* Header */}
       <div className="p-6 flex items-center justify-between">
         {isOpen && <h1 className="text-2xl font-bold mx-auto">GRX</h1>}
+
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="hover:bg-[#FF006A] p-2 rounded"
@@ -24,27 +20,31 @@ function Sidebar({
         </button>
       </div>
 
+      {/* Navigation */}
       <nav className="mt-8 space-y-2 px-4">
         {menuItems.map((item) => (
-          <button
+          <NavLink
             key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              activeTab === item.id ? "bg-[#f06ea5]" : "hover:bg-[#f06ea5]"
-            }`}
+            to={`/u/${item.id}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                isActive ? "bg-[#f06ea5]" : "hover:bg-[#f06ea5]"
+              } ${!isOpen ? "justify-center" : ""}`
+            }
           >
             <item.icon size={20} />
             {isOpen && <span>{item.label}</span>}
-          </button>
+          </NavLink>
         ))}
       </nav>
 
+      {/* Logout */}
       <div className="absolute bottom-8 left-4 right-4">
         <button
+          onClick={handleLogout}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-purple-700 transition ${
             !isOpen ? "justify-center" : ""
           }`}
-          onClick={handleLogout}
         >
           <LogOut size={20} />
           {isOpen && <span>Logout</span>}

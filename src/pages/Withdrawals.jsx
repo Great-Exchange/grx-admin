@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   CheckCircle,
   XCircle,
@@ -10,7 +11,8 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-function Withdrawals({ withdrawals, onViewDetails, loading }) {
+function Withdrawals() {
+  const { withdrawals, loading, setSelectedWithdrawalId } = useOutletContext();
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -235,7 +237,7 @@ function Withdrawals({ withdrawals, onViewDetails, loading }) {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button
-                        onClick={() => onViewDetails(withdrawal.id)}
+                        onClick={() => setSelectedWithdrawalId(withdrawal.id)}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                           withdrawal.status?.toLowerCase() === "pending"
                             ? "bg-purple-600 text-white hover:bg-purple-700"
